@@ -4,9 +4,14 @@ com.twilio.sdk.examples
 com.twilio.sdk.parser
 com.twilio.sdk.resource
 com.twilio.sdk.resource.factory
+com.twilio.sdk.resource.factory.impl
 com.twilio.sdk.resource.factory.sip
+com.twilio.sdk.resource.factory.taskrouter
 com.twilio.sdk.resource.instance
 com.twilio.sdk.resource.instance.sip
+com.twilio.sdk.resource.instance.taskrouter
 com.twilio.sdk.resource.list
 com.twilio.sdk.resource.list.sip
+com.twilio.sdk.resource.list.taskrouter
+com.twilio.sdk.taskrouter
 com.twilio.sdk.verbs
