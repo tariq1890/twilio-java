@@ -58,8 +58,7 @@ public class PublicKey extends Jwt {
         Map<String, Object> paylaod = new HashMap<>();
 
         String hashedHeaders = HASH_FUNCTION.hashString(Joiner.on(";").join(signedHeaders), Charsets.UTF_8).toString();
-        String encodedHeaders = String.valueOf(Hex.encodeHex(hashedHeaders.getBytes(), true));
-        paylaod.put("hrh", encodedHeaders);
+        paylaod.put("hrh", hashedHeaders);
 
         StringBuilder signature = new StringBuilder();
         signature.append(method).append("\n");
@@ -75,7 +74,7 @@ public class PublicKey extends Jwt {
             }
         }
         signature.append("\n");
-        signature.append(encodedHeaders).append("\n");
+        signature.append(hashedHeaders).append("\n");
 
         String hashedPayload = HASH_FUNCTION.hashString(requestBody, Charsets.UTF_8).toString();
         signature.append(Hex.encodeHex(hashedPayload.getBytes(), true)).append("\n");
