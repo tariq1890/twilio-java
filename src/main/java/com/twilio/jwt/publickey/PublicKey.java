@@ -1,6 +1,7 @@
 package com.twilio.jwt.publickey;
 
 import com.google.common.base.Charsets;
+import com.google.common.base.Function;
 import com.google.common.base.Joiner;
 import com.google.common.hash.HashFunction;
 import com.google.common.hash.Hashing;
@@ -12,13 +13,16 @@ import org.apache.http.Header;
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpEntityEnclosingRequest;
 import org.apache.http.HttpRequest;
+import org.apache.http.message.BasicHeader;
 
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.Collection;
+import java.util.Arrays;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 
@@ -30,7 +34,7 @@ public class PublicKey extends Jwt {
     private final String uri;
     private final String queryString;
     private final Header[] headers;
-    private final Collection<String> signedHeaders;
+    private final List<String> signedHeaders;
     private final String requestBody;
 
     private PublicKey(Builder b) {
@@ -57,29 +61,41 @@ public class PublicKey extends Jwt {
     public Map<String, Object> getClaims() {
         Map<String, Object> paylaod = new HashMap<>();
 
-        String hashedHeaders = HASH_FUNCTION.hashString(Joiner.on(";").join(signedHeaders), Charsets.UTF_8).toString();
-        paylaod.put("hrh", hashedHeaders);
+        Collections.sort(signedHeaders);
+        String includedHeaders = Joiner.on(";").join(signedHeaders);
+        paylaod.put("hrh", includedHeaders);
 
         StringBuilder signature = new StringBuilder();
         signature.append(method).append("\n");
         signature.append(uri).append("\n");
-        signature.append(queryString).append("\n");
 
-        for (Header header: headers) {
-            if (signedHeaders.contains(header.getName())) {
+        String[] queryArgs = queryString.split("&");
+        Arrays.sort(queryArgs);
+        String sortedQueryString = Joiner.on("&").join(queryArgs);
+        signature.append(sortedQueryString).append("\n");
+
+        Header[] lowercaseHeaders = LOWERCASE_KEYS.apply(headers);
+        Arrays.sort(lowercaseHeaders, new Comparator<Header>() {
+            @Override
+            public int compare(Header o1, Header o2) {
+                return o1.getName().compareTo(o2.getName());
+            }
+        });
+        for (Header header: lowercaseHeaders) {
+            if (signedHeaders.contains(header.getName().toLowerCase())) {
                 signature.append(header.getName().toLowerCase().trim())
                     .append(":")
                     .append(header.getValue().trim())
                     .append("\n");
             }
         }
-        signature.append("\n");
-        signature.append(hashedHeaders).append("\n");
+        signature.append(includedHeaders).append("\n");
 
         String hashedPayload = HASH_FUNCTION.hashString(requestBody, Charsets.UTF_8).toString();
         signature.append(Hex.encodeHex(hashedPayload.getBytes(), true)).append("\n");
 
-        paylaod.put("rqh", signature.toString());
+        String hashedSignature = HASH_FUNCTION.hashString(signature.toString(), Charsets.UTF_8).toString();
+        paylaod.put("rqh", Hex.encodeHex(hashedSignature.getBytes(), true));
 
         return paylaod;
     }
@@ -88,7 +104,7 @@ public class PublicKey extends Jwt {
         String credentialSid,
         String privateKey,
         HttpRequest request,
-        Collection<String> signedHeaders
+        List<String> signedHeaders
     ) throws IOException {
         Builder builder = new Builder(credentialSid, privateKey);
 
@@ -115,6 +131,18 @@ public class PublicKey extends Jwt {
         return builder.build();
     }
 
+    private static Function<Header[], Header[]> LOWERCASE_KEYS = new Function<Header[], Header[]>() {
+        @Override
+        public Header[] apply(Header[] headers) {
+            Header[] lowercaseHeaders = new Header[headers.length];
+            for (int i = 0; i < headers.length; i++) {
+                lowercaseHeaders[i] = new BasicHeader(headers[i].getName().toLowerCase(), headers[i].getValue());
+            }
+
+            return lowercaseHeaders;
+        }
+    };
+
     public static class Builder {
 
         private String credentialSid;
@@ -123,7 +151,7 @@ public class PublicKey extends Jwt {
         private String uri;
         private String queryString = "";
         private Header[] headers;
-        private Collection<String> signedHeaders = Collections.emptyList();
+        private List<String> signedHeaders = Collections.emptyList();
         private String requestBody = "";
         private int ttl = 3600;
 
@@ -152,7 +180,7 @@ public class PublicKey extends Jwt {
             return this;
         }
 
-        public Builder signedHeaders(Collection<String> signedHeaders) {
+        public Builder signedHeaders(List<String> signedHeaders) {
             this.signedHeaders = signedHeaders;
             return this;
         }
